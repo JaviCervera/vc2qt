@@ -58,7 +58,7 @@ inline void str::write(const std::string& str, const std::string& filename, bool
 }
 
 inline std::string str::strip_ext(const std::string& filename) {
-	return filename.substr(0, filename.find('.'));
+	return filename.substr(0, filename.rfind('.'));
 }
 
 inline std::string str::strip_dir(const std::string& filename) {
