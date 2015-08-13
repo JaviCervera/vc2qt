@@ -34,10 +34,14 @@ int main(int argc, char* argv[]) {
   }
 
   // Parse VC project
+  cout << "Parsing VC project..." << endl;
   ProjectInfo project(str::read(vcfile));
+  cout << "Parsed" << endl;
 
   // Export Qt project
+  cout << "Generating Qt project..." << endl;
   str::write(project.GetAsQtProject(), qtfile, false);
+  cout << "Generated" << endl;
 
   return 0;
 }

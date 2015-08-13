@@ -6,6 +6,7 @@
 class ProjectInfo {
 public:
   enum Subsystem {
+    Undefined,
     Console,
     Gui,
     StaticLib,

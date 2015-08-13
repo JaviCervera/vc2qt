@@ -11,7 +11,7 @@ using namespace std;
 ProjectInfo::ProjectInfo(const std::string& vcFileContents) {
   // Object has not been initialized yet
   mIsOk = false;
-  mSubsystem = Console;
+  mSubsystem = Undefined;
 
   // Parse XML VC project
   xml_document<> doc;
@@ -21,9 +21,9 @@ ProjectInfo::ProjectInfo(const std::string& vcFileContents) {
   xml_node<>* projectNode = doc.first_node("Project");
   if ( !projectNode ) return;
 
-  // Parse project name
+  // Parse project name on PropertyGroup(Label=Globals)->RootNamespace
   xml_node<>* propertyGroupNode = projectNode->first_node("PropertyGroup");
-  while ( propertyGroupNode ) {
+  while ( propertyGroupNode && mName == "" ) {
     xml_attribute<>* labelAttr = propertyGroupNode->first_attribute("Label");
 
     // Parse project name
@@ -31,6 +31,35 @@ ProjectInfo::ProjectInfo(const std::string& vcFileContents) {
       xml_node<>* rootNamespaceNode = propertyGroupNode->first_node("RootNamespace");
       if ( rootNamespaceNode ) {
         mName = rootNamespaceNode->value();
+      }
+    }
+
+    propertyGroupNode = propertyGroupNode->next_sibling();
+  }
+
+  // Parse PropertyGroupp(Condition=$(Platform)'=='Release|Win)->ConfigurationType
+  // If parsing of name failed previouly, parse it now from PropertyGroup(Condition=$(Platform)'=='Release|Win)->TargetName
+  propertyGroupNode = projectNode->first_node("PropertyGroup");
+  while ( propertyGroupNode ) {
+    // Only parse Release config by now...
+    xml_attribute<>* conditionAttr = propertyGroupNode->first_attribute("Condition");
+    if ( conditionAttr && string(conditionAttr->value()).find("$(Platform)'=='Release|Win") != string::npos ) {
+      xml_node<>* configurationTypeNode = propertyGroupNode->first_node("ConfigurationType");
+      if ( configurationTypeNode ) {
+        string configurationType = configurationTypeNode->value();
+        if ( configurationType == "StaticLibrary" ) {
+          mSubsystem = StaticLib;
+        } else if ( configurationType == "DynamicLibrary" ) {
+          mSubsystem = SharedLib;
+        }
+      }
+
+      // Parse name if needed
+      if ( mName == "" ) {
+        xml_node<>* targetNameNode = propertyGroupNode->first_node("TargetName");
+        if ( targetNameNode ) {
+          mName = targetNameNode->value();
+        }
       }
     }
 
@@ -85,7 +114,7 @@ ProjectInfo::ProjectInfo(const std::string& vcFileContents) {
       if ( linkNode ) {
         // Subsystem
         xml_node<>* subsystemNode = linkNode->first_node("SubSystem");
-        if ( subsystemNode ) {
+        if ( subsystemNode && mSubsystem == Undefined ) {
           string subsystem = subsystemNode->value();
           if ( subsystem == "Console" ) {
             mSubsystem = Console;
@@ -128,12 +157,26 @@ string ProjectInfo::GetAsQtProject() const {
 
   // Write template
   switch ( mSubsystem ) {
+  case Undefined:
+    cout << "Warning: Subsystem is undefined" << endl;
+    break;
   case Console:
     qtpro += "TEMPLATE = app\n";
+    qtpro += "CONFIG += console\n";
+    qtpro += "CONFIG -= app_bundle\n";
     break;
   case Gui:
     qtpro += "TEMPLATE = app\n";
     break;
+  case StaticLib:
+    qtpro += "TEMPLATE = lib\n";
+    qtpro += "CONFIG += staticlib\n";
+    break;
+  case SharedLib:
+    qtpro += "TEMPLATE = lib\n";
+    break;
+  default:
+    cout << "Warning: Unhandled Subsystem" << endl;
   }
 
   // Write config
